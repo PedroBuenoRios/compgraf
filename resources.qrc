@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/imgs">
+        <file>imgs/triangulo.png</file>
+        <file>imgs/retas-continuas.png</file>
+        <file>imgs/reta.png</file>
+        <file>imgs/quadrado.png</file>
+        <file>imgs/clicker.png</file>
+    </qresource>
+</RCC>
