@@ -24,6 +24,7 @@ public:
     Window *window;
     QList<Objeto*> displayFile;
     QPen caneta;
+    QList<Vec4> listaTemp;
     // Desenha um objeto
     void desenharObjeto(Objeto *obj, QPainter &painter);
     // Atualiza as propriedades de desenho de cada objeto
@@ -42,11 +43,10 @@ private:
     void adicionarPontoTemp(int x, int y);
     Desenhando _estado;
     int _clicks;
-    QList<Vec3> _listaTemp;
     std::vector<std::vector<int>> _descRetas;
 
-    Vec3 vwToSCN(Vec3 vw);
-    Vec3 SCNToWorld(Vec3 scn, Window &window);
+    Vec4 vwToSCN(Vec4 vw);
+    Vec4 SCNToWorld(Vec4 scn, Window &window);
 };
 
 #endif // MAINFRAME_H

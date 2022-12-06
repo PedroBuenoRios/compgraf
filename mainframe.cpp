@@ -5,30 +5,30 @@ mainFrame::mainFrame()
 }
 
 mainFrame::mainFrame(QWidget *parent): QFrame{parent}{
-    window = new Window(Vec3(0,0,1), 360, 150);
+    window = new Window(Vec4(0,0,60),108, 45);
     _clicks = 0;
     displayFile = QList<Objeto*>();
-    Objeto *q1 = new Objeto(TipoObjeto::OBJ_POLIGONO, "Casa 1", Ponto(Vec3(0, 0)));
+    Objeto *q1 = new Objeto(TipoObjeto::OBJ_POLIGONO, "Casa 1", Ponto(Vec4(0, 0,0)));
     QList<Ponto> listaAux;
     // retangulo
-    listaAux.append(Ponto(Vec3(0,0)));
-    listaAux.append(Ponto(Vec3(50,0)));
-    listaAux.append(Ponto(Vec3(50,70)));
-    listaAux.append(Ponto(Vec3(0, 70)));
+    listaAux.append(Ponto(Vec4(0,0,0)));
+    listaAux.append(Ponto(Vec4(50,0,0)));
+    listaAux.append(Ponto(Vec4(50,70,0)));
+    listaAux.append(Ponto(Vec4(0, 70,0)));
     // retangulo
-    listaAux.append(Ponto(Vec3(10,0)));
-    listaAux.append(Ponto(Vec3(20,0)));
-    listaAux.append(Ponto(Vec3(20,20)));
-    listaAux.append(Ponto(Vec3(10,20)));
+    listaAux.append(Ponto(Vec4(10,0,0)));
+    listaAux.append(Ponto(Vec4(20,0,0)));
+    listaAux.append(Ponto(Vec4(20,20,0)));
+    listaAux.append(Ponto(Vec4(10,20,0)));
     // retangulo
-    listaAux.append(Ponto(Vec3(30,20)));
-    listaAux.append(Ponto(Vec3(40,20)));
-    listaAux.append(Ponto(Vec3(40,30)));
-    listaAux.append(Ponto(Vec3(30,30)));
+    listaAux.append(Ponto(Vec4(30,20,0)));
+    listaAux.append(Ponto(Vec4(40,20,0)));
+    listaAux.append(Ponto(Vec4(40,30,0)));
+    listaAux.append(Ponto(Vec4(30,30,0)));
     // triangulo
-    listaAux.append(Ponto(Vec3(50,70)));
-    listaAux.append(Ponto(Vec3(0, 70)));
-    listaAux.append(Ponto(Vec3(25,90)));
+    listaAux.append(Ponto(Vec4(50,70,0)));
+    listaAux.append(Ponto(Vec4(0, 70,0)));
+    listaAux.append(Ponto(Vec4(25,90,0)));
     _descRetas = {{0,1}, {1,2}, {2,3}, {3,0},
                           {4,5}, {5,6}, {6,7}, {7,4},
                           {8, 9}, {9,10}, {10,11}, {11,8},
@@ -54,7 +54,7 @@ void mainFrame::paintEvent(QPaintEvent *event){
 void mainFrame::desenharObjeto(Objeto *obj, QPainter &painter){
    QPen caneta = QPen(obj->cor, this->caneta.width());
    painter.setPen(caneta);
-   for(Reta *r : obj->getListaDeRetas()){
+   for(auto *r : obj->getListaDeRetas()){
        if(r->desenhar){
        int x1, x2, y1, y2;
        x1 = (int)r->getPonto(0)->getVwPosicao().x;
@@ -89,7 +89,7 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
         else if(_clicks == 2){
             adicionarPontoTemp(pMouse.x(), pMouse.y());
             QList<Ponto> laux = QList<Ponto>();
-            for(auto v : _listaTemp){
+            for(auto v : listaTemp){
                 v = vwToSCN(v);
                 v = SCNToWorld(v, *window);
                 laux.append(Ponto(v));
@@ -104,7 +104,7 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
             displayFile.append(obj);
             emit objetoAdicionado(obj);
             update();
-            _listaTemp.clear();
+            listaTemp.clear();
             _descRetas.clear();
             _clicks = 0;
         }
@@ -116,11 +116,11 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
         }
         else if(_clicks == 2){
             adicionarPontoTemp(pMouse.x(), pMouse.y());
-            adicionarPontoTemp(pMouse.x(), _listaTemp.at(0).y);
-            adicionarPontoTemp(_listaTemp.at(0).x, pMouse.y());
+            adicionarPontoTemp(pMouse.x(), listaTemp.at(0).y);
+            adicionarPontoTemp(listaTemp.at(0).x, pMouse.y());
 
             QList<Ponto> laux = QList<Ponto>();
-            for(auto v : _listaTemp){
+            for(auto v : listaTemp){
                 v = vwToSCN(v);
                 v = SCNToWorld(v, *window);
                 laux.append(Ponto(v));
@@ -139,7 +139,7 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
             emit objetoAdicionado(obj);
             update();
 
-            _listaTemp.clear();
+            listaTemp.clear();
             _descRetas.clear();
             _clicks = 0;
         }
@@ -156,7 +156,7 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
             adicionarPontoTemp(pMouse.x(), pMouse.y());
 
             QList<Ponto> laux = QList<Ponto>();
-            for(auto v : _listaTemp){
+            for(auto v : listaTemp){
                 v = vwToSCN(v);
                 v = SCNToWorld(v, *window);
                 laux.append(Ponto(v));
@@ -175,7 +175,7 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
             emit objetoAdicionado(obj);
             update();
 
-            _listaTemp.clear();
+            listaTemp.clear();
             _descRetas.clear();
             _clicks = 0;
         }
@@ -187,8 +187,8 @@ void mainFrame::mousePressEvent(QMouseEvent *event){
     event->accept();
 }
 
-Vec3 mainFrame::vwToSCN(Vec3 vw){
-    Vec3 aux = Vec3();
+Vec4 mainFrame::vwToSCN(Vec4 vw){
+    Vec4 aux = Vec4();
     aux.x = (window->max.x - window->min.x)*(vw.x - 10)/(width() - 20) + window->min.x;
     aux.y = (window->max.y - window->min.y)*(vw.y - 10)/(height() - 20) - window->min.y - 1;
     aux.y = 1 - aux.y;
@@ -196,18 +196,18 @@ Vec3 mainFrame::vwToSCN(Vec3 vw){
     return aux;
 }
 
-Vec3 mainFrame::SCNToWorld(Vec3 scn, Window &window){
+Vec4 mainFrame::SCNToWorld(Vec4 scn, Window &window){
     Transformes tr;
-    tr.escalonar(Vec3(window.getLargura()/2, window.getAltura()/2));
+    tr.escalonar(Vec4(window.getLargura()/2, window.getAltura()/2, 0));
     return scn*tr.matriz;
 }
 
 void mainFrame::adicionarPontoTemp(int x, int y){
-    _listaTemp.append(Vec3((double)x, (double)y));
+    listaTemp.append(Vec4((double)x, (double)y, 0));
 }
 
 void mainFrame::pararDesenho(){
     _clicks = 0;
-    _listaTemp.clear();
+    listaTemp.clear();
     _descRetas.clear();
 }

@@ -1,11 +1,12 @@
 #include "objeto.h"
+#include <QDebug>
 /***************************************************************************/
 Objeto::Objeto()
 {
     _tipo = OBJ_POLIGONO;
     _nome = "Poligono";
     _retas = QList<Reta*>();
-    _origem = Vec3(0,0);
+    _origem = Vec4(0,0,0);
     cor = QColor(0,0,0);
 }
 
@@ -36,11 +37,16 @@ Ponto Objeto::getOrigem(){
     return _origem;
 }
 
+QList<Face*> Objeto::getListaDeFaces(){
+    return _faces;
+}
+
 // Setters
 
 void Objeto::setListaDeRetas(std::vector<std::vector<int>> descRetas, int nlinhas){
     _retas.clear();
     _nLinhas = nlinhas;
+    _descRetas.clear();
     for(int l = 0; l < nlinhas; l++){
         _descRetas.push_back(descRetas.at(l));
         Ponto p1 = *(_pontos.at(descRetas.at(l).at(0)));
@@ -67,6 +73,28 @@ void Objeto::setPontos(QList<Ponto> pts){
         _pontos.append(new Ponto(p));
     }
     ajustarOrigem();
+}
+
+void Objeto::setFaces(QVector<QVector<int>> df, int nf){
+    _faces.clear();
+    _nFaces = nf;
+    QList<Ponto> pts;
+    for(int i = 0; i < nf; i++){
+       // descFaces.append(df.at(i));
+        for(int j = 0; j < df.at(i).length(); j++){
+            if(df[i][j] > _pontos.length())
+                qDebug() << "Teste" <<'\n';
+
+            pts.append(*(_pontos.at(df[i][j])));
+
+            if(j == (df.at(i).length() - 1))
+                _descRetas.push_back(std::vector<int>({df[i][j], df[i][0]}));
+            else
+                _descRetas.push_back(std::vector<int>({df[i][j], df[i][j+1]}));
+        }
+        _faces.append(new Face(pts));
+    }
+    setListaDeRetas(_descRetas, _descRetas.size());
 }
 
 void Objeto::transformar(Transformes tr){
@@ -122,7 +150,24 @@ void Objeto::atualizarVw(int w, int h, Window &window){
     }
 }
 
+void Objeto::atualizarVCS(Transformes &tr){
+    Vec4 aux;
+    for(Ponto *p : qAsConst(_pontos)){
+        p->setVCSPosicao(tr.matriz*p->getPosicaoNoMundo());
+        aux = p->getVCSPosicao();
+        aux.x = p->getVCSPosicao().x/p->getVCSPosicao().w;
+        aux.y = p->getVCSPosicao().y/p->getVCSPosicao().w;
+        p->setVCSPosicao(aux);
+    }
+    for(Reta *r : qAsConst(_retas)){
+        r->atualizarVCS(tr);
+    }
+}
+
 void Objeto::atualizar(int w, int h, Window &window){
+    Transformes tr;
+    tr.WCparaVCS(window);
+    atualizarVCS(tr);
     atualizarSCN(window);
     atualizarRC(window);
     clippingCohenSutherland(window);
@@ -132,21 +177,21 @@ void Objeto::atualizar(int w, int h, Window &window){
 
 void Objeto::ajustarOrigem(){
     int n = _pontos.length();
-    Vec3 ori = Vec3(0,0);
+    Vec4 ori = Vec4(0,0,0);
     for(int i = 0; i < n; i++){
         ori.x += _pontos.at(i)->getPosicaoNoMundo().x;
         ori.y += _pontos.at(i)->getPosicaoNoMundo().y;
-        //ori.z += _pontos.at(i)->getPosicaoNoMundo().z;
+        ori.z += _pontos.at(i)->getPosicaoNoMundo().z;
     }
     ori.x = ori.x/n;
     ori.y = ori.y/n;
-
+    ori.z = ori.z/n;
     _origem.setPosicaoNoMundo(ori);
 }
 
 void Objeto::clippingCohenSutherland(Window &window){
      unsigned short rc1 = 0b0000, rc2 = 0b0000;
-     for(Reta *r : _retas){
+     for(Reta *r : qAsConst(_retas)){
          rc1 = r->getPonto(0)->getRC();
          rc2 = r->getPonto(1)->getRC();
          //Segmento completamente dentro da window
@@ -223,7 +268,7 @@ bool Objeto::intersectaWindowEixoX(Ponto *p,double m, Window &window, double y2)
     double x = 0.0;
     x = p->getSCNPosicao().x + (1/m) *(y2 - p->getSCNPosicao().y);
     if(x >= window.min.x && x <= window.max.x){
-        Vec3 scn = Vec3(x, y2);
+        Vec4 scn = Vec4(x, y2, 0);
         p->setSCNPosicao(scn);
         return true;
     }
@@ -233,7 +278,7 @@ bool Objeto::intersectaWindowEixoX(Ponto *p,double m, Window &window, double y2)
 bool Objeto::intersectaWindowEixoY(Ponto *p, double m, Window &window, double x2){
      double y = m*(x2 - p->getSCNPosicao().x) + p->getSCNPosicao().y;
     if(y >= window.min.y && y <= window.max.y ){
-        Vec3 scn = Vec3(x2, y);
+        Vec4 scn = Vec4(x2, y, 0);
         p->setSCNPosicao(scn);
         return true;
     }
@@ -242,21 +287,21 @@ bool Objeto::intersectaWindowEixoY(Ponto *p, double m, Window &window, double x2
 
 /***************************************************************************/
 
-Ponto::Ponto(const Vec3 &p){
+Ponto::Ponto(const Vec4 &p){
     _mPosicao = p;
-    _scnPosicao = Vec3(0,0);
+    _scnPosicao = Vec4(0, 0, 0);
     _rc = 0b0000;
 }
 
 Ponto::Ponto(){
-    _mPosicao = Vec3(0,0);
-    _scnPosicao = Vec3(0,0);
+    _mPosicao = Vec4(0, 0, 0);
+    _scnPosicao = Vec4(0, 0, 0);
     _rc = 0b0000;
 }
 
 Ponto::Ponto(double x, double y, double z){
-    _mPosicao = Vec3(x,y,z);
-    _scnPosicao = Vec3(0,0);
+    _mPosicao = Vec4(x,y,z);
+    _scnPosicao = Vec4(0,0, 0);
     _rc = 0b0000;
 }
 
@@ -272,11 +317,11 @@ void Ponto::setRC(Window &window){
         _rc = _rc | 0b0001;
 }
 
-Vec3 Ponto::getPosicaoNoMundo(){
+Vec4 Ponto::getPosicaoNoMundo(){
     return _mPosicao;
 }
 
-Vec3 Ponto::getSCNPosicao(){
+Vec4 Ponto::getSCNPosicao(){
     return _scnPosicao;
 }
 
@@ -284,21 +329,29 @@ unsigned short Ponto::getRC(){
     return _rc;
 }
 
-Vec3 Ponto::getVwPosicao() const {
+Vec4 Ponto::getVwPosicao() const {
     return _vwPosicao;
+}
+
+Vec4 Ponto::getVCSPosicao(){
+    return _vcsPosicao;
+}
+
+void Ponto::setVCSPosicao(const Vec4 &p){
+    _vcsPosicao = p;
 }
 
 void Ponto::setSCNPosicao(Window &window){
     Transformes tr = Transformes();
-    tr.escalonar(Vec3(1.0/(window.getLargura()/2.0), 1.0/(window.getAltura()/2.0)));
-    _scnPosicao = _mPosicao*tr.matriz;
+    tr.escalonar(Vec4(1.0/(window.getLargura()/2.0), 1.0/(window.getAltura()/2.0), 0));
+    _scnPosicao = _vcsPosicao*tr.matriz;
 }
 
 void Ponto::setSCNPosicao(const Transformes &tr){
-    _scnPosicao = _mPosicao*tr.matriz;
+    _scnPosicao = _vcsPosicao*tr.matriz;
 }
 
-void Ponto::setSCNPosicao(Vec3 &s){
+void Ponto::setSCNPosicao(Vec4 &s){
     _scnPosicao.x = s.x;
     _scnPosicao.y = s.y;
     _scnPosicao.z = s.z;
@@ -312,7 +365,7 @@ void Ponto::setVwPosicao(int w, int h, Window &window){
 
 }
 
-void Ponto::setPosicaoNoMundo(const Vec3 &mp){
+void Ponto::setPosicaoNoMundo(const Vec4 &mp){
     _mPosicao = mp;
 }
 
@@ -358,4 +411,30 @@ void Reta::atualizarVw(int w, int h, Window &window){
     _pontos[1]->setVwPosicao(w, h, window);
 }
 
+void Reta::atualizarVCS(Transformes &tr){
+    Vec4 aux;
+    _pontos[0]->setVCSPosicao(_pontos[0]->getPosicaoNoMundo()*tr.matriz);
+    aux = _pontos[0]->getVCSPosicao();
+    aux.x = _pontos[0]->getVCSPosicao().x/_pontos[0]->getVCSPosicao().w;
+    aux.y = _pontos[0]->getVCSPosicao().y/_pontos[0]->getVCSPosicao().w;
+    _pontos[0]->setVCSPosicao(aux);
 
+    _pontos[1]->setVCSPosicao(_pontos[1]->getPosicaoNoMundo()*tr.matriz);
+    aux = _pontos[1]->getVCSPosicao();
+    aux.x = _pontos[1]->getVCSPosicao().x/_pontos[1]->getVCSPosicao().w;
+    aux.y = _pontos[1]->getVCSPosicao().y/_pontos[1]->getVCSPosicao().w;
+    _pontos[1]->setVCSPosicao(aux);
+}
+
+Face::Face(){
+    pontos = QList<Ponto*>();
+}
+
+Face::Face(QList<Ponto> pts){
+    for(auto pt : pts){
+        pontos.append(new Ponto(pt));
+    }
+}
+Face::~Face(){
+    pontos.clear();
+}

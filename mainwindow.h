@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include "objeto.h"
 #include <QListWidgetItem>
+#include <QStackedWidget>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -20,6 +21,8 @@ public:
     void transformarDisplayFile(Transformes tr);
     void transformarObjeto();
     void normalizarObjetos(Transformes tr);
+    Objeto *lerArquivoOBJ(const char *caminho);
+    QStackedWidget *stack;
 
 private:
     Ui::MainWindow *ui;

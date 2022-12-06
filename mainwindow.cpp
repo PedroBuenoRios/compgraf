@@ -1,5 +1,10 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include <regex>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -10,7 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
     QObject::connect(ui->frame, SIGNAL(objetoAdicionado(Objeto*)), this, SLOT(adicionarObjetoUI(Objeto*)));
     // Configurando os controles do usuário
     // Controles da caneta
-    ui->tamanhoCaneta->setRange(2, 10);
+    ui->tamanhoCaneta->setRange(1, 10);
     ui->tamanhoCaneta->setSingleStep(1);
     // Controles da Window
     ui->spinWindowX->setMinimum(-30000);
@@ -70,7 +75,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->listaObjetos->addItem(ui->frame->displayFile.last()->getNome());
     ui->listaObjetos->setCurrentRow(0);
-    aplicarTransformacoes();
+    lerArquivoOBJ("/home/pedro/Documentos/Dev/CompGraf/entrega04/Charizard.obj");
+    lerArquivoOBJ("/home/pedro/Documentos/Dev/CompGraf/entrega04/Maxwell.obj");
+    ui->frame->atualizarObjetos();
 }
 
 MainWindow::~MainWindow()
@@ -112,27 +119,33 @@ void MainWindow::transformarWindow(){
     // Verifica se houve translação
     if( window->getOrigem().x != ui->spinWindowX->value() ||
         window->getOrigem().y != ui->spinWindowY->value()){
+       // window->getOrigem().z != ui->spinWindowZ->value()){
 
-        Vec3 passo;
+        Vec4 passo;
         passo.x = -(ui->spinWindowX->value() - window->getOrigem().x);
         passo.y = -(ui->spinWindowY->value() - window->getOrigem().y);
+       // passo.z = -(ui->spinWindowZ->value() - window->getOrigem().z);
         tr.transladar(passo);
     }
     // Aplicando rotação
     double dg = ui->spinWindowRotacao->value();
-    tr.rotacionar(dg);
-
+    tr.rotacionar(dg,EIXO::Z);
     // Movendo para a origem
-    tr.transladar(Vec3(-window->getOrigem().x,
-                       -window->getOrigem().y));
+    tr.transladar(Vec4(-window->getOrigem().x,
+                       -window->getOrigem().y,
+                       0));
 
     ui->spinWindowAltura->setValue(window->getAltura()*ui->spinWindowEscala->value());
     ui->spinWindowLargura->setValue(window->getLargura()*ui->spinWindowEscala->value());
     window->setAltura(ui->spinWindowAltura->value());
     window->setLargura(ui->spinWindowLargura->value());
+
     ui->spinWindowEscala->setValue(1.0);
+
     window->setGrausRotacionados(ui->spinWindowRotacao->value());
-    window->setOrigem(Vec3(ui->spinWindowX->value(), ui->spinWindowY->value(), 1));
+
+    window->setOrigem(Vec4(ui->spinWindowX->value(), ui->spinWindowY->value(), window->getOrigem().z));
+   // window->calcularVetoresNormais();
     transformarDisplayFile(tr);
 }
 
@@ -144,28 +157,32 @@ void MainWindow::transformarDisplayFile(Transformes tr){
 
 void MainWindow::transformarObjeto(){
     int i = ui->listaObjetos->currentRow();
+    EIXO eixo = EIXO::Y;
     if(i < 0)
         return;
     Objeto *obj = ui->frame->displayFile.at(i);
     Transformes tr;
     // Aplicando as transformações
     // Voltando para o ponto 'inicial'
-    tr.transladar(Vec3(
+    tr.transladar(Vec4(
                       obj->getOrigem().getPosicaoNoMundo().x,
-                      obj->getOrigem().getPosicaoNoMundo().y));
+                      obj->getOrigem().getPosicaoNoMundo().y,
+                      obj->getOrigem().getPosicaoNoMundo().z));
     // Rotacionando
-    tr.rotacionar(ui->spinObjRotacao->value());
+    tr.rotacionar(ui->spinObjRotacao->value(), eixo);
     // Escalonando
-    Vec3 v(ui->spinObjEscala->value(),ui->spinObjEscala->value());
+    Vec4 v(ui->spinObjEscala->value(),ui->spinObjEscala->value(), ui->spinObjEscala->value());
     tr.escalonar(v);
      //Transladando
     v.x = ui->spinObjTransX->value();
     v.y = ui->spinObjTransY->value();
+    v.z = 0;
     tr.transladar(v);
     // Movendo para a origem antes de aplicar as transformações
-    tr.transladar(Vec3(
+    tr.transladar(Vec4(
                       -obj->getOrigem().getPosicaoNoMundo().x,
-                      -obj->getOrigem().getPosicaoNoMundo().y));
+                      -obj->getOrigem().getPosicaoNoMundo().y,
+                      -obj->getOrigem().getPosicaoNoMundo().z));
     obj->transformar(tr);
     ui->spinObjEscala->setValue(1.0);
     selecionarObj();
@@ -206,3 +223,52 @@ void MainWindow::pararDesenho(){
     ui->btnOcioso->setDown(true);
 }
 
+Objeto *MainWindow::lerArquivoOBJ(const char *caminho){
+    FILE *arq = fopen(caminho, "r");
+
+    if(arq == NULL){
+        printf("Não foi possível abrir o Arquivo OBJ\n");
+        return NULL;
+    }
+    char *linha = (char *)malloc(255);
+    std::string aux = std::string();
+   // std::regex regex_vertices(R"( -?[0-9]+\.[0-9]+)");
+    std::regex regex_face(R"( [0-9]+)");
+
+    std::smatch matches;
+
+    Objeto *obj = new Objeto();
+    QList<Ponto> pts = QList<Ponto>();
+
+    while(!feof(arq)){
+        fscanf(arq, "%s", linha);
+        if(strcmp(linha, "v") == 0){
+            Vec4 v = Vec4();
+            fscanf(arq, "%lf %lf %lf\n", &v.x, &v.y, &v.z);
+            pts.append(Ponto(v));
+        }
+        else if(strcmp(linha, "f") == 0){
+            fgets(linha, 255, arq);
+            aux = std::string(linha);
+            std::sregex_iterator currentMatch(aux.begin(), aux.end(), regex_face);
+            std::sregex_iterator lastMatch;
+
+            obj->descFaces.append(QVector<int>());
+
+            while(currentMatch != lastMatch){
+                matches = *currentMatch;
+                obj->descFaces.last().append(std::stoi(matches.str()) - 1);
+                currentMatch++;
+            }
+        }
+        else{
+            fgets(linha, 255, arq);
+        }
+    }
+    obj->setPontos(pts);
+    obj->setFaces(obj->descFaces, obj->descFaces.length());
+ //   obj->atualizar(ui->frame->width(), ui->frame->height(), *(ui->frame->window));
+    obj->setNome(QString(caminho));
+    adicionarObjetoUI(obj);
+    ui->frame->displayFile.append(obj);
+}
